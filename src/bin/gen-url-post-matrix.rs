@@ -26,7 +26,9 @@ fn main() -> anyhow::Result<()> {
         }
 
         let url_meta_id = url_id as usize;
-        post_ids.resize(url_meta_id + 1, 0);
+        if post_ids.len() <= url_meta_id + 1 {
+            post_ids.resize(url_meta_id + 1, 0);
+        }
         post_ids[url_meta_id] = post_id as u32;
     }
 

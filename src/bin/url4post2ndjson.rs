@@ -35,8 +35,9 @@ fn main() -> anyhow::Result<()> {
 
         let url_indexed_id = url_indexed["id"].as_u64().unwrap() as usize;
         let post_id_opt = url_post_matrix.get(url_indexed_id).transpose().unwrap();
-        if let Some(post_id) = post_id_opt.and_then(|&[x]| x) {
-            url_indexed["id"] = Value::Number(Number::from(post_id.get()));
+        match post_id_opt.and_then(|&[x]| x) {
+            Some(post_id) => url_indexed["id"] = Value::Number(Number::from(post_id.get())),
+            None => continue,
         }
 
         serde_json::to_writer(&mut stdout, &url_indexed)?;
