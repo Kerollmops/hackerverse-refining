@@ -5,7 +5,7 @@ use std::num::NonZeroU32;
 use std::path::PathBuf;
 
 use clap::Parser;
-use hackernews_embs2ndjson::MatLEView;
+use hackerverse_refining::MatLEView;
 use memmap2::Mmap;
 use serde_json::{Deserializer, Number, Value};
 

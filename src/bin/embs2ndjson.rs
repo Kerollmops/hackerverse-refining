@@ -3,7 +3,7 @@ use std::io::{self, stdout, Write};
 use std::path::PathBuf;
 
 use clap::Parser;
-use hackernews_embs2ndjson::MatLEView;
+use hackerverse_refining::MatLEView;
 use memmap2::Mmap;
 use serde::ser::Serialize;
 use serde_json::ser::Serializer;
