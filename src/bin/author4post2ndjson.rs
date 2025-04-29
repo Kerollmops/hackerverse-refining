@@ -36,9 +36,12 @@ fn main() -> anyhow::Result<()> {
     for result in Deserializer::from_reader(io::stdin()).into_iter() {
         let mut post: Value = result?;
 
+        let post_id = post["id"].as_u64().unwrap();
         let author_id = post["author"].as_u64().unwrap() as u32;
-        let username = *usernames.get(&author_id).unwrap();
-        post["author"] = Value::String(username.to_owned());
+        match usernames.get(&author_id) {
+            Some(&username) => post["author"] = Value::String(username.to_owned()),
+            None => eprintln!("Unknown author ID {author_id} in post ID {post_id}"),
+        };
 
         serde_json::to_writer(&mut stdout, &post)?;
         writeln!(&mut stdout)?;
