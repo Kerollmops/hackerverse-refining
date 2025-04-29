@@ -13,8 +13,8 @@ use serde_json::{Deserializer, Number, Value};
 /// with IDs corresponding to the posts instead of the URLs.
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
-struct GenUrlPostMatrix {
-    /// The one-dimension `.mat` file copiling relations between the URLs and the posts.
+struct Url4Post2Ndjson {
+    /// The one-dimension `.mat` file compiling relations between the URLs and the posts.
     ///
     /// It is generated from the `posts.ndjson` file with the `gen-url-post-matrix` tool.
     #[arg(long)]
@@ -22,7 +22,7 @@ struct GenUrlPostMatrix {
 }
 
 fn main() -> anyhow::Result<()> {
-    let GenUrlPostMatrix { url_post_matrix } = GenUrlPostMatrix::parse();
+    let Url4Post2Ndjson { url_post_matrix } = Url4Post2Ndjson::parse();
 
     let url_post_matrix_file = File::open(url_post_matrix)?;
     let url_post_matrix = unsafe { Mmap::map(&url_post_matrix_file)? };
