@@ -1,48 +1,58 @@
-use std::fs::File;
 use std::io;
 use std::io::Write as _;
-use std::num::NonZeroU32;
 use std::path::PathBuf;
+use std::{collections::HashMap, fs::File};
 
 use clap::Parser;
-use hackerverse_refining::MatLEView;
-use memmap2::Mmap;
+use serde::Deserialize;
 use serde_json::{Deserializer, Number, Value};
 
-/// Takes an `.ndjson` file as input, the matrix and outputs the input
-/// with IDs corresponding to the posts instead of the URLs.
+/// Takes an `.ndjson` file as input, the list of urls and
+/// outputs the input with the ID of the post instead of the URLs.
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Url4Post2Ndjson {
-    /// The one-dimension `.mat` file compiling relations between the URLs and the posts.
-    ///
-    /// It is generated from the `posts.ndjson` file with the `gen-url-post-matrix` tool.
+    /// The `posts.ndjson` file.
     #[arg(long)]
-    url_post_matrix: PathBuf,
+    posts: PathBuf,
 }
 
 fn main() -> anyhow::Result<()> {
-    let Url4Post2Ndjson { url_post_matrix } = Url4Post2Ndjson::parse();
+    let Url4Post2Ndjson { posts } = Url4Post2Ndjson::parse();
 
-    let url_post_matrix_file = File::open(url_post_matrix)?;
-    let url_post_matrix = unsafe { Mmap::map(&url_post_matrix_file)? };
-    let url_post_matrix = MatLEView::<1, Option<NonZeroU32>>::new(&url_post_matrix);
+    let posts_file = File::open(posts)?;
+    let mut url_to_posts = HashMap::<_, Vec<_>>::new();
+
+    eprintln!("Preparing the url meta ids table...");
+    for (i, result) in Deserializer::from_reader(posts_file).into_iter().enumerate() {
+        let JustIdAndUrl { id: post_id, url: url_id } = result?;
+
+        if i % 1000 == 0 {
+            eprintln!("{i} posts seen so far");
+        }
+
+        url_to_posts.entry(url_id).or_default().push(post_id);
+    }
 
     // Now we stream the url metas and modify the ids to the post ones
     let mut stdout = io::stdout();
     for result in Deserializer::from_reader(io::stdin()).into_iter() {
         let mut url_indexed: Value = result?;
+        let url_indexed_id = url_indexed["id"].as_u64().unwrap() as u32;
+        let post_ids_opt = url_to_posts.get(&url_indexed_id).unwrap();
 
-        let url_indexed_id = url_indexed["id"].as_u64().unwrap() as usize;
-        let post_id_opt = url_post_matrix.get(url_indexed_id).transpose().unwrap();
-        match post_id_opt.and_then(|&[x]| x) {
-            Some(post_id) => url_indexed["id"] = Value::Number(Number::from(post_id.get())),
-            None => continue,
+        for post_id in post_ids_opt {
+            url_indexed["id"] = Value::Number(Number::from(*post_id));
+            serde_json::to_writer(&mut stdout, &url_indexed)?;
+            writeln!(&mut stdout)?;
         }
-
-        serde_json::to_writer(&mut stdout, &url_indexed)?;
-        writeln!(&mut stdout)?;
     }
 
     Ok(())
+}
+
+#[derive(Deserialize)]
+struct JustIdAndUrl {
+    id: u32,
+    url: u32,
 }
