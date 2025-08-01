@@ -2,7 +2,8 @@ use std::fs::File;
 use std::io::{self, stdout, Write};
 use std::path::PathBuf;
 
-use clap::Parser;
+use bytemuck::PodCastError;
+use clap::{Parser, ValueEnum};
 use hackerverse_refining::MatLEView;
 use memmap2::Mmap;
 use serde::ser::Serialize;
@@ -20,10 +21,22 @@ struct HackernewsEmbs2Ndjson {
     /// The float precision
     #[arg(long, default_value_t = 2)]
     float_precision: usize,
+
+    /// The number of dimensions of the embeddings
+    #[arg(long, short, value_enum)]
+    dimensions: VectorDimensions,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum VectorDimensions {
+    #[clap(name = "512")]
+    Is512,
+    #[clap(name = "1024")]
+    Is1024,
 }
 
 fn main() -> anyhow::Result<()> {
-    let HackernewsEmbs2Ndjson { embs_ids_path, embs_data_path, float_precision } =
+    let HackernewsEmbs2Ndjson { embs_ids_path, embs_data_path, dimensions, float_precision } =
         HackernewsEmbs2Ndjson::parse();
 
     let embs_ids_file = File::open(embs_ids_path)?;
@@ -32,7 +45,10 @@ fn main() -> anyhow::Result<()> {
 
     let embs_data_file = File::open(embs_data_path)?;
     let embs_data = unsafe { Mmap::map(&embs_data_file)? };
-    let embs_data = MatLEView::<512, f32>::new(&embs_data);
+    let embs_data = match dimensions {
+        VectorDimensions::Is512 => AnyMatLEView::Is512(MatLEView::<512, f32>::new(&embs_data)),
+        VectorDimensions::Is1024 => AnyMatLEView::Is1024(MatLEView::<1024, f32>::new(&embs_data)),
+    };
 
     // Prepare the object with the fields
     let mut object = serde_json::Map::new();
@@ -66,6 +82,20 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+enum AnyMatLEView<'a> {
+    Is512(MatLEView<'a, 512, f32>),
+    Is1024(MatLEView<'a, 1024, f32>),
+}
+
+impl AnyMatLEView<'_> {
+    fn get(&self, index: usize) -> Option<Result<&[f32], PodCastError>> {
+        match self {
+            AnyMatLEView::Is512(mat) => mat.get(index).map(|r| r.map(|s| s.as_slice())),
+            AnyMatLEView::Is1024(mat) => mat.get(index).map(|r| r.map(|s| s.as_slice())),
+        }
+    }
 }
 
 struct SmallFloatsFormatter {
